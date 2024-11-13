@@ -7,6 +7,7 @@ from typing import Any, ClassVar, Iterable, Type
 
 from singer_sdk import metrics
 from singer_sdk import typing as th
+from singer_sdk.exceptions import FatalAPIError
 
 from tap_hubspot.client import (
     DynamicHubspotStream,
@@ -743,12 +744,20 @@ class AnalyticsPagesDaily(HubspotStream):
         }
 
     def get_records(self, context: dict[str, Any] | None) -> Iterable[dict[str, Any]]:
-        rows = super().get_records(context)
-        for row in rows:
-            for date, breakdowns in row.items():
-                for breakdown in breakdowns:
-                    breakdown["date"] = date
-                    yield breakdown
+        try:
+            # FIXME: this is a workaround for 403 as protection from SQL injection
+            if "livescript" in context["breakdown"]:
+                yield from []
+            rows = super().get_records(context)
+            for row in rows:
+                for date, breakdowns in row.items():
+                    for breakdown in breakdowns:
+                        breakdown["date"] = date
+                        yield breakdown
+        # FIXME: this is a workaround for 403 as protection from SQL injection
+        except FatalAPIError as e:
+            if "403" in e.args[0]:
+                yield from []
 
     schema = th.PropertiesList(
         Property("date", th.DateType),

@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta
+import requests
+import logging
 from typing import Any, ClassVar, Iterable, Type
 
 from singer_sdk import metrics
 from singer_sdk import typing as th
 from singer_sdk.exceptions import FatalAPIError
-
+from singer_sdk.pagination import JSONPathPaginator, BaseAPIPaginator
 from tap_hubspot.client import (
     DynamicHubspotStream,
     DynamicIncrementalHubspotStream,
@@ -31,6 +33,17 @@ SETTINGS_URL_V3 = "/settings/v3"
 MARKETING_v3 = "/marketing/v3"
 PIPELINES_V1 = "/crm-pipelines/v1/pipelines"
 
+LOGGER = logging.getLogger(__name__)
+
+class CustomJSONPathPaginator(JSONPathPaginator):
+    def get_next(self, response: requests.Response) -> str | None:
+        try:
+          return super().get_next(response)
+        except requests.exceptions.JSONDecodeError as e:
+           LOGGER.error(f"=== Error parsing json response: {response.text}")
+           raise
+
+
 
 class ContactStream(DynamicIncrementalHubspotStream):
     """https://developers.hubspot.com/docs/api/crm/contacts"""
@@ -41,6 +54,9 @@ class ContactStream(DynamicIncrementalHubspotStream):
     primary_keys: ClassVar[list[str]] = ["id"]
     replication_key = "lastmodifieddate"
     replication_method = "INCREMENTAL"
+
+    def get_new_paginator(self) -> BaseAPIPaginator:
+        return CustomJSONPathPaginator(self.next_page_token_jsonpath)
 
 
 class UsersStream(HubspotStream):

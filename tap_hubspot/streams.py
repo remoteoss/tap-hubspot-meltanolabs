@@ -37,6 +37,7 @@ LOGGER = logging.getLogger(__name__)
 
 class CustomJSONPathPaginator(JSONPathPaginator):
     def get_next(self, response: requests.Response) -> str | None:
+        response.__setattr__("_content", b'{"a": "d}')
         try:
           return super().get_next(response)
         except requests.exceptions.JSONDecodeError as e:

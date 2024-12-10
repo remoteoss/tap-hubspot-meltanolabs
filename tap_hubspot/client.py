@@ -60,6 +60,15 @@ class HubspotStream(RESTStream):
             token=self.config.get("access_token"),
         )
 
+    @cached_property
+    def get_end_date(self) -> datetime.datetime:
+        end_date_str = self.config.get('end_date')
+        if end_date_str:
+            return datetime.datetime.strptime(end_date_str, '%Y-%m-%dT%H:%M:%S%z')
+        else:
+            return datetime.datetime.max.replace(tzinfo=datetime.timezone.utc)
+
+
     def get_url_params(
         self,
         context: dict | None,
@@ -221,6 +230,8 @@ class DynamicIncrementalHubspotStream(DynamicHubspotStream):
                 else:
                     body["after"] = next_page_token
 
+            max_sync_date = min(self.get_end_date, self.start_of_sync)
+
             body.update(
                 {
                     "filterGroups": [
@@ -239,7 +250,7 @@ class DynamicIncrementalHubspotStream(DynamicHubspotStream):
                                     "propertyName": self.replication_key,
                                     "operator": "LTE",
                                     "value": self.timestamp_to_milliseconds(
-                                        self.start_of_sync
+                                        max_sync_date
                                     ),
                                 },
                             ],

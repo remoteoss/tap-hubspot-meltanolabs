@@ -5,12 +5,15 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 import requests
 import logging
+import typing as t
 from typing import Any, ClassVar, Iterable, Type
 
 from singer_sdk import metrics
 from singer_sdk import typing as th
 from singer_sdk.exceptions import FatalAPIError
 from singer_sdk.pagination import JSONPathPaginator, BaseAPIPaginator
+from singer_sdk.helpers.types import Context
+
 from tap_hubspot.client import (
     DynamicHubspotStream,
     DynamicIncrementalHubspotStream,
@@ -57,6 +60,17 @@ class ContactStream(DynamicIncrementalHubspotStream):
 
     def get_new_paginator(self) -> BaseAPIPaginator:
         return CustomJSONPathPaginator(self.next_page_token_jsonpath)
+
+    def request_records(self, context: Context | None) -> t.Iterable[dict]:
+        try:
+            return super().request_records(context)
+        except FatalAPIError as e:
+            if "400" in e.args[0]:
+                LOGGER.error(f"=== 400 error while requesting records, stopping execution: {e}")
+                LOGGER.error(f"=== Context: {context}")
+                yield from []
+            else:
+                raise
 
 
 class UsersStream(HubspotStream):

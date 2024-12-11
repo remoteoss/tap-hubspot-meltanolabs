@@ -63,14 +63,15 @@ class ContactStream(DynamicIncrementalHubspotStream):
 
     def request_records(self, context: Context | None) -> t.Iterable[dict]:
         try:
-            return super().request_records(context)
+            records = super().request_records(context)
         except FatalAPIError as e:
             if "400" in e.args[0]:
                 LOGGER.error(f"=== 400 error while requesting records, stopping execution: {e}")
                 LOGGER.error(f"=== Context: {context}")
-                yield from []
+                records = iter([])
             else:
                 raise
+        return records
 
 
 class UsersStream(HubspotStream):

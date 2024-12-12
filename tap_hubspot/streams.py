@@ -61,17 +61,46 @@ class ContactStream(DynamicIncrementalHubspotStream):
     def get_new_paginator(self) -> BaseAPIPaginator:
         return CustomJSONPathPaginator(self.next_page_token_jsonpath)
 
+    def validate_response(self, response: requests.Response) -> None:
+        raise FatalAPIError("400 Client Error")
+
+    # def _request(
+    #     self,
+    #     prepared_request: requests.PreparedRequest,
+    #     context: Context | None,
+    # ) -> requests.Response:
+    #     try:
+    #         return super()._request(prepared_request, context)
+    #     except Exception as e:
+    #         # if "400" in e.args[0]:
+    #         LOGGER.error(f"+++ 400 error while requesting records, stopping execution: {e}")
+    #         LOGGER.error(f"+++ Context: {context}")
+    #         return None
+    #         # else:
+    #         #     raise
+
+    def request_decorator(self, func: t.Callable) -> t.Callable:
+        try:
+            return super().request_decorator(func)
+        except Exception as e:
+            # if "400" in e.args[0]:
+            LOGGER.error(f"=== 400 error while requesting records, stopping execution: {e}")
+            LOGGER.error(f"=== Context: {context}")
+            return None
+            # else:
+            #     raise
+
     def request_records(self, context: Context | None) -> t.Iterable[dict]:
         try:
-            records = super().request_records(context)
-        except FatalAPIError as e:
+            yield from super().request_records(context)
+        except Exception as e:
             if "400" in e.args[0]:
                 LOGGER.error(f"=== 400 error while requesting records, stopping execution: {e}")
                 LOGGER.error(f"=== Context: {context}")
-                records = iter([])
+                yield from []
             else:
                 raise
-        return records
+        # return records
 
 
 class UsersStream(HubspotStream):
